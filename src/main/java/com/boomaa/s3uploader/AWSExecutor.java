@@ -1,13 +1,11 @@
 package com.boomaa.s3uploader;
 
 import com.google.gson.JsonParser;
-import org.apache.commons.io.input.NullInputStream;
 import org.jsoup.nodes.Document;
 
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -16,8 +14,8 @@ import java.util.function.Supplier;
 
 public class AWSExecutor {
     private final String NEO_CRED_URL = "/uploader?data_json=%7B%22controller%22%3A%22locker%22%2C%22action%22%3A%22list%22%2C%22" +
-        "resource%22%3A%22File%22%2C%22location%22%3A%22ClassResource%22%2C%22to_controller%22%3A%22locker%22%2C%22to_id%22%3An" +
-        "ull%2C%22auto%22%3Atrue%2C%22type%22%3A%22FileResource%22%2C%22new%22%3A%22true%22%7D";
+            "resource%22%3A%22File%22%2C%22location%22%3A%22ClassResource%22%2C%22to_controller%22%3A%22locker%22%2C%22to_id%22%3An" +
+            "ull%2C%22auto%22%3Atrue%2C%22type%22%3A%22FileResource%22%2C%22new%22%3A%22true%22%7D";
     private final String AWS_BUCKET_URL = "https://s3.amazonaws.com/s3.edu20.org/";
     private final NEOSession session;
 
@@ -26,16 +24,17 @@ public class AWSExecutor {
     }
 
     public String[] remove(String filename) {
+        Extension ext = Extension.getFromFilename(filename);
         Map<String, String> credVars = getAWSCredentials();
         MultipartFormData fileData = new MultipartFormData.DefaultBuilder(filename)
-            .setInputStream(new NullInputStream(1000)).build();
-        String extension = filename.substring(filename.lastIndexOf(".") + 1);
-        uploadImage(getAWSFormData(credVars, filename, Extension.valueOf(extension).getMimeType()), fileData);
+                .setInputStream(new ByteArrayInputStream(new byte[0]))
+                .setExtension(ext).build();
+        uploadImage(getAWSFormData(credVars, filename, ext.mimeType), fileData);
         return getMultiUrl(credVars, filename);
     }
 
     public String[] uploadFile(String filename) {
-        return uploadFile(filename, false);
+        return uploadFile(filename, true);
     }
 
     public String[] uploadFile(String filename, boolean registerFilename) {
@@ -51,30 +50,33 @@ public class AWSExecutor {
     }
 
     public String[] upload(String filename, boolean registerFilename, Supplier<InputStream> input) {
+        Extension ext = Extension.getFromFilename(filename);
         if (registerFilename) {
             filename = registerNeoFilename(filename);
         }
         Map<String, String> credVars = getAWSCredentials();
         MultipartFormData fileData = new MultipartFormData.DefaultBuilder(filename)
-            .setInputStream(input.get()).build();
-        String extension = filename.substring(filename.lastIndexOf(".") + 1);
-        uploadImage(getAWSFormData(credVars, filename, Extension.valueOf(extension).getMimeType()), fileData);
+                .setInputStream(input.get()).setExtension(ext).build();
+        uploadImage(getAWSFormData(credVars, filename, ext.mimeType), fileData);
         return getMultiUrl(credVars, filename);
     }
 
     public String[] getMultiUrl(Map<String, String> credVars, String filename) {
-        String addUrl = credVars.get("aws_location") + "/" + filename;
-        return new String[] { AWS_BUCKET_URL + addUrl,  session.getBaseUrl() + "/" + addUrl };
+        String addUrl = credVars.get("aws_location") + "/" + URLEncoder.encode(filename, StandardCharsets.UTF_8);
+        return new String[] { AWS_BUCKET_URL + addUrl, session.getBaseUrl() + "/" + addUrl };
     }
 
     private String registerNeoFilename(String filename) {
         Map<String, String> data = new HashMap<>();
+        data.put("file_type", "image/jpg");
+        //TODO figure out if this is needed
+        data.put("file_size", "2050");
         data.put("file_name", filename);
 
         String neoFilename = filename;
         try {
             Document registeredJson = session.getConnection("/upload/file")
-                .data(data).ignoreContentType(true).post();
+                    .data(data).ignoreContentType(true).post();
             neoFilename = JsonParser.parseString(registeredJson.text()).getAsJsonObject().get("name").getAsString();
         } catch (IOException e) {
             e.printStackTrace();
@@ -84,7 +86,7 @@ public class AWSExecutor {
 
     private Map<String, String> getAWSCredentials() {
         String returnedVarString = session.get(NEO_CRED_URL).getElementsByTag("script")
-            .get(0).html().replaceAll("\\ +", "");
+                .get(0).html().replaceAll("\\ +", "");
         List<String> lineSortedVars = new ArrayList<>();
         int lastIndex = 0;
         for (int i = 0; i < returnedVarString.length(); i++) {
@@ -113,10 +115,10 @@ public class AWSExecutor {
     private Document uploadImage(Map<String, String> awsFormData, MultipartFormData fileData) {
         try {
             return session.getConnection(AWS_BUCKET_URL, false)
-                .data(awsFormData).data(fileData.getKey(), fileData.getFilename(), fileData.getInputStream())
-                .header("Content-Type", "multipart/form-data")
-                .ignoreHttpErrors(true).ignoreContentType(true)
-                .post();
+                    .data(awsFormData).data(fileData.getKey(), fileData.getFilename(), fileData.getInputStream())
+                    .header("Content-Type", "multipart/form-data")
+                    .ignoreHttpErrors(true).ignoreContentType(true)
+                    .post();
         } catch (IOException e) {
             e.printStackTrace();
         }

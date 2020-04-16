@@ -15,15 +15,19 @@ public final class NEOSession {
     public NEOSession(String username, String password) {
         try {
             authCookieValue = Jsoup.connect(getLoginUrl(username, password))
-                .ignoreContentType(true).execute().cookie(authCookieName);
+                    .ignoreContentType(true).execute().cookie(authCookieName);
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
-    
+
     public final Document get(String url) {
+        return get(url, true);
+    }
+
+    public final Document get(String url, boolean useBaseUrl) {
         try {
-            return getConnection(url).get();
+            return getConnection(url, useBaseUrl).get();
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -31,8 +35,12 @@ public final class NEOSession {
     }
 
     public final Document post(Map<String, String> data, String url) {
+        return post(data, url, true);
+    }
+
+    public final Document post(Map<String, String> data, String url, boolean useBaseUrl) {
         try {
-            return getConnection(url).data(data).post();
+            return getConnection(url, useBaseUrl).data(data).post();
         } catch (IOException e) {
             e.printStackTrace();
         }
