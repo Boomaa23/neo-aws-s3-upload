@@ -183,6 +183,7 @@ public enum Extension {
     xlsx("vnd.ms-excel"),
     xlt("application/vnd.ms-excel"),
     xlw("application/vnd.ms-excel"),
+    xml("application/xml"),
     xof("x-world/x-vrml"),
     xpm("image/x-xpixmap"),
     xwd("image/x-xwindowdump"),
