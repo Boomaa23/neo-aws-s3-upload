@@ -197,6 +197,10 @@ public enum Extension {
     }
 
     public static Extension getFromFilename(String filename) {
-        return Extension.valueOf(filename.substring(filename.lastIndexOf('.') + 1));
+        try {
+            return Extension.valueOf(filename.substring(filename.lastIndexOf('.') + 1));
+        } catch (IllegalArgumentException e) {
+            return Extension.bin;
+        }
     }
 }
